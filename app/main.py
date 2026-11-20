@@ -9,7 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
-from app.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.core.middleware import (
+    BodySizeLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.core.redis import close_redis
 from app.db.session import engine
 from app.features.assistant.router import router as assistant_router
@@ -90,7 +94,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description=DESCRIPTION,
         openapi_tags=TAGS,
         lifespan=lifespan,
-        max_body_size=settings.max_body_bytes,
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
@@ -106,6 +109,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
         expose_headers=["X-Request-ID"],
     )
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.env == "prod")
     app.add_middleware(RequestContextMiddleware)
 

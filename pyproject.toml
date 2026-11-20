@@ -65,6 +65,7 @@ filterwarnings = ["ignore::DeprecationWarning:google.*"]
 
 [tool.coverage.run]
 source = ["app"]
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
 show_missing = true
