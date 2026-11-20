@@ -13,7 +13,7 @@ from app.shared.pagination import Page, Pagination
 
 router = APIRouter(prefix="/jobs", tags=["jobs"], responses=error_responses(401))
 
-SORT_PATTERN = r"^-?(updated_at|company|role|status|applied_at)$"
+SORT_PATTERN = r"^-?(updated_at|company|role|status|applied_at|position)$"
 
 
 @router.get("", response_model=Page[JobOut], responses=error_responses(422))

@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ValidationFailed
@@ -20,6 +20,7 @@ SORT_COLUMNS = {
     "role": Job.role,
     "status": Job.status,
     "applied_at": Job.applied_at,
+    "position": Job.position,
 }
 NON_NULLABLE = {"company", "role", "currency", "status", "tags", "position"}
 
@@ -68,11 +69,30 @@ def _check_salary(job: Job) -> None:
         )
 
 
-async def _next_position(db: AsyncSession, user_id: uuid.UUID, status: JobStatus) -> int:
-    current = await db.scalar(
-        select(func.max(Job.position)).where(Job.user_id == user_id, Job.status == status)
-    )
-    return 0 if current is None else int(current) + 1
+async def _column(
+    db: AsyncSession, user_id: uuid.UUID, status: JobStatus, exclude: uuid.UUID | None
+) -> list[Job]:
+    stmt = select(Job).where(Job.user_id == user_id, Job.status == status)
+    if exclude is not None:
+        stmt = stmt.where(Job.id != exclude)
+    rows = await db.scalars(stmt.order_by(Job.position, Job.updated_at.desc(), Job.id))
+    return list(rows)
+
+
+async def _place(
+    db: AsyncSession, job: Job, source: JobStatus | None, position: int | None
+) -> None:
+    """Put `job` at `position` (0-based, default top) of its status column and renumber the
+    column — and the column it left — to contiguous 0..n-1. Runs inside the caller's
+    transaction, so the whole move commits atomically."""
+    target = await _column(db, job.user_id, job.status, exclude=job.id)
+    index = min(max(position or 0, 0), len(target))
+    target.insert(index, job)
+    for i, item in enumerate(target):
+        item.position = i
+    if source is not None and source != job.status:
+        for i, item in enumerate(await _column(db, job.user_id, source, exclude=job.id)):
+            item.position = i
 
 
 def _today() -> Any:
@@ -84,31 +104,25 @@ async def create_job(db: AsyncSession, user_id: uuid.UUID, data: JobCreate) -> J
     position = values.pop("position")
     job = Job(user_id=user_id, **values)
     _check_salary(job)
-    job.position = (
-        position if position is not None else await _next_position(db, user_id, job.status)
-    )
     if job.status == JobStatus.APPLIED and job.applied_at is None:
         job.applied_at = _today()
     db.add(job)
     await db.flush()
+    await _place(db, job, None, position)
     db.add(JobStatusEvent(job_id=job.id, from_status=None, to_status=job.status))
     await db.commit()
     await invalidate_dashboard(user_id)
     return job
 
 
-async def _apply_status(
-    db: AsyncSession, job: Job, status: JobStatus, position: int | None
-) -> None:
-    if status != job.status:
-        db.add(JobStatusEvent(job_id=job.id, from_status=job.status, to_status=status))
-        if position is None:
-            position = await _next_position(db, job.user_id, status)
+async def _move(db: AsyncSession, job: Job, status: JobStatus, position: int | None) -> None:
+    source = job.status
+    if status != source:
+        db.add(JobStatusEvent(job_id=job.id, from_status=source, to_status=status))
         job.status = status
         if status == JobStatus.APPLIED and job.applied_at is None:
             job.applied_at = _today()
-    if position is not None:
-        job.position = position
+    await _place(db, job, source, position)
 
 
 async def update_job(
@@ -123,8 +137,8 @@ async def update_job(
             continue
         setattr(job, key, value)
     _check_salary(job)
-    if status is not None or position is not None:
-        await _apply_status(db, job, status or job.status, position)
+    if (status is not None and status != job.status) or position is not None:
+        await _move(db, job, status or job.status, position)
     await db.commit()
     await invalidate_dashboard(user_id)
     return job
@@ -134,7 +148,7 @@ async def change_status(
     db: AsyncSession, job_id: uuid.UUID, user_id: uuid.UUID, status: JobStatus, position: int | None
 ) -> Job:
     job = await get_job(db, job_id, user_id)
-    await _apply_status(db, job, status, position)
+    await _move(db, job, status, position)
     await db.commit()
     await invalidate_dashboard(user_id)
     return job
@@ -142,7 +156,11 @@ async def change_status(
 
 async def delete_job(db: AsyncSession, job_id: uuid.UUID, user_id: uuid.UUID) -> None:
     job = await get_job(db, job_id, user_id)
+    status = job.status
     await db.delete(job)
+    await db.flush()
+    for i, item in enumerate(await _column(db, user_id, status, exclude=None)):
+        item.position = i
     await db.commit()
     await invalidate_dashboard(user_id)
 

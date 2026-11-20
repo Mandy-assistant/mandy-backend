@@ -83,9 +83,14 @@ under it for 5 minutes and deleted on first use.
 
 ### Jobs
 - `Job` = `{id, company, role, location, url, salary_min, salary_max, currency, status: saved|applied|interview|offer|rejected, applied_at: date|null, interview_at: datetime|null, notes, contact, tags: [str], position, created_at, updated_at}`
-- `GET /jobs?status=&q=&sort=&page=&size=` → `Page[Job]`; `sort` ∈ `updated_at, company, role, status, applied_at` with optional `-` prefix (default `-updated_at`). `size` max 200.
+- `GET /jobs?status=&q=&sort=&page=&size=` → `Page[Job]`; `sort` ∈ `updated_at, company, role, status, applied_at, position` with optional `-` prefix (default `-updated_at`). `size` max 200.
+  The board fetches with `sort=position` and groups by status.
 - `POST /jobs`, `GET|PATCH|DELETE /jobs/{id}`
 - `PATCH /jobs/{id}/status` `{status, position?}` → `Job` (records event; sets `applied_at` = today when moving to applied and empty)
+  `position` = the card's 0-based index within the **target** status column after the move (omitted → top, index 0).
+  In one transaction the target column is renumbered to contiguous `0..n-1` and the gap in the source column is closed.
+  The same placement applies to `POST /jobs` (new jobs go on top unless `position` is given), `PATCH /jobs/{id}` with
+  `status`/`position`, and `DELETE /jobs/{id}` (closes the gap).
 - `GET /jobs/{id}/timeline` → `[{id, from_status|null, to_status, changed_at}]` (creation is the first event with `from_status: null`)
 
 ### Roadmaps
@@ -148,6 +153,9 @@ Additions/clarifications made while implementing the backend (no breaking change
 - Auth error codes beyond the ones listed: `CHALLENGE_EXPIRED` (401, unknown/expired/already-used `flow_id`),
   `RECOVERY_TOKEN_INVALID` (401, bad/expired/used recovery token), `PASSKEY_EXISTS` (409, credential already registered),
   `PASSKEY_NOT_FOUND` (404). Refresh tokens are rotated: a used refresh token is rejected (401) and the cookies are cleared.
-- `POST /auth/passkeys/verify` responds `201`.
+- `POST /auth/passkeys/verify` responds `201`. All `POST` create endpoints (`/jobs`, `/tasks`, `/roadmaps`, milestones,
+  profile items, resumes, `/resumes/{id}/duplicate`, `/resumes/{id}/versions`, `/focus/sessions`, `/roadmaps/generate`)
+  respond `201`; `POST /roadmaps` returns `RoadmapDetail`.
+- Jobs board ordering: `sort=position` added; `position` semantics for moves defined above (frontend request).
 - Postgres host port is configurable via `POSTGRES_HOST_PORT` (docker compose, default `5433`) for machines where 5433
   is also taken; `DATABASE_URL` must match.

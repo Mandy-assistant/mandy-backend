@@ -38,7 +38,12 @@ class JobUpdate(JobBase):
 
 class JobStatusUpdate(BaseModel):
     status: JobStatus
-    position: int | None = Field(default=None, ge=0)
+    position: int | None = Field(
+        default=None,
+        ge=0,
+        description="0-based index within the target status column after the move "
+        "(default: top). Both columns are renumbered to 0..n-1.",
+    )
 
 
 class JobOut(ORMModel):

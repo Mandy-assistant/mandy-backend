@@ -60,12 +60,12 @@ async def test_status_change_and_timeline(auth_client: httpx.AsyncClient) -> Non
     r = await auth_client.patch(
         f"/jobs/{job['id']}/status", json={"status": "interview", "position": 3}
     )
-    assert r.json()["position"] == 3
+    assert r.json()["position"] == 0  # clamped: the column is empty
     # same status, only position
     r = await auth_client.patch(
         f"/jobs/{job['id']}/status", json={"status": "interview", "position": 1}
     )
-    assert r.json()["position"] == 1
+    assert r.json()["position"] == 0
     # status through generic PATCH also records an event
     r = await auth_client.patch(f"/jobs/{job['id']}", json={"status": "offer"})
     assert r.json()["status"] == "offer"
@@ -82,7 +82,7 @@ async def test_created_as_applied_sets_date(auth_client: httpx.AsyncClient) -> N
     job = await _job(auth_client, status="applied")
     assert job["applied_at"] is not None
     job2 = await _job(auth_client, status="applied", applied_at="2026-01-02")
-    assert job2["applied_at"] == "2026-01-02" and job2["position"] == 1
+    assert job2["applied_at"] == "2026-01-02" and job2["position"] == 0  # new jobs go on top
 
 
 async def test_filter_search_sort_paginate(auth_client: httpx.AsyncClient) -> None:
@@ -136,3 +136,41 @@ async def test_jobs_unauthenticated(client: httpx.AsyncClient) -> None:
     r = await client.get("/jobs")
     assert r.status_code == 401
     assert r.json()["error"]["code"] == "UNAUTHENTICATED"
+
+
+async def test_board_positions_are_contiguous(auth_client: httpx.AsyncClient) -> None:
+    async def column(status: str) -> list[str]:
+        r = await auth_client.get("/jobs", params={"status": status, "sort": "position"})
+        items = r.json()["items"]
+        assert [j["position"] for j in items] == list(range(len(items)))
+        return [j["company"] for j in items]
+
+    ids = {}
+    for name in ("A", "B", "C"):
+        ids[name] = (await _job(auth_client, company=name, status="applied"))["id"]
+    assert await column("applied") == ["C", "B", "A"]  # newest on top
+    x = await _job(auth_client, company="X", status="interview")
+    ids["X"] = x["id"]
+
+    # move B into interview at index 1 -> source column closes the gap
+    r = await auth_client.patch(
+        f"/jobs/{ids['B']}/status", json={"status": "interview", "position": 1}
+    )
+    assert r.json()["position"] == 1
+    assert await column("interview") == ["X", "B"]
+    assert await column("applied") == ["C", "A"]
+    # omitted position -> top
+    await auth_client.patch(f"/jobs/{ids['A']}/status", json={"status": "interview"})
+    assert await column("interview") == ["A", "X", "B"]
+    # reorder within a column
+    await auth_client.patch(f"/jobs/{ids['A']}/status", json={"status": "interview", "position": 2})
+    assert await column("interview") == ["X", "B", "A"]
+    await auth_client.patch(f"/jobs/{ids['A']}", json={"position": 0})
+    assert await column("interview") == ["A", "X", "B"]
+    # delete closes the gap
+    await auth_client.delete(f"/jobs/{ids['X']}")
+    assert await column("interview") == ["A", "B"]
+    await _job(auth_client, company="Y", status="interview", position=1)
+    assert await column("interview") == ["A", "Y", "B"]
+    r = await auth_client.get("/jobs", params={"sort": "-position"})
+    assert r.status_code == 200
