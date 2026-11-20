@@ -9,6 +9,12 @@ from fastapi import Depends, Query
 from app.core.exceptions import ValidationFailed
 
 
+def ensure_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def to_utc_iso(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
