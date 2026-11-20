@@ -16,6 +16,7 @@ from app.features.auth.router import dev_router as auth_dev_router
 from app.features.auth.router import router as auth_router
 from app.features.health.router import router as health_router
 from app.features.profile.router import router as profile_router
+from app.features.resumes.router import router as resumes_router
 
 API_PREFIX = "/api/v1"
 
@@ -59,6 +60,7 @@ def build_api_router(settings: Settings) -> APIRouter:
     api.include_router(health_router)
     api.include_router(auth_router)
     api.include_router(profile_router)
+    api.include_router(resumes_router)
     if settings.dev_login_active:
         api.include_router(auth_dev_router)
     return api

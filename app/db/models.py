@@ -3,6 +3,7 @@
 from app.db.base import Base
 from app.features.auth.models import PasskeyCredential, RecoveryCode, User
 from app.features.profile.models import Education, Experience, Profile, Skill
+from app.features.resumes.models import Resume, ResumeVersion
 
 __all__ = [
     "Base",
@@ -11,6 +12,8 @@ __all__ = [
     "PasskeyCredential",
     "Profile",
     "RecoveryCode",
+    "Resume",
+    "ResumeVersion",
     "Skill",
     "User",
 ]
