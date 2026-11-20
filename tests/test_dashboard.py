@@ -126,3 +126,26 @@ async def test_summary_tz_validation(auth_client: httpx.AsyncClient) -> None:
     assert r.status_code == 422
     r = await auth_client.get("/dashboard/summary", params={"tz": "Asia/Kolkata"})
     assert r.status_code == 200
+
+
+async def test_summary_accepts_legacy_timezone_alias(auth_client: httpx.AsyncClient) -> None:
+    # Chrome reports "Asia/Calcutta"; Postgres rejects it inside timezone().
+    await auth_client.post(
+        "/focus/sessions",
+        json={
+            "duration_minutes": 25,
+            "started_at": "2026-11-20T04:00:00Z",
+            "ended_at": "2026-11-20T04:25:00Z",
+        },
+    )
+    r = await auth_client.get("/dashboard/summary", params={"tz": "Asia/Calcutta"})
+    assert r.status_code == 200, r.text
+
+
+def test_canonical_tz_name() -> None:
+    from app.shared.timeutil import canonical_tz_name, parse_tz
+
+    assert canonical_tz_name("Asia/Calcutta") == "Asia/Kolkata"
+    assert canonical_tz_name("Europe/Kiev") == "Europe/Kyiv"
+    assert canonical_tz_name("Asia/Kolkata") == "Asia/Kolkata"
+    assert parse_tz("Asia/Calcutta").key == "Asia/Kolkata"

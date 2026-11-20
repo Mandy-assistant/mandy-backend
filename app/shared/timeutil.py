@@ -1,6 +1,8 @@
 """Timezone helpers (all storage is UTC; `tz` query params pick the user's local day)."""
 
 from datetime import UTC, date, datetime, time, timedelta
+from functools import cache
+from importlib import resources
 from typing import Annotated
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -21,9 +23,35 @@ def to_utc_iso(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
-def parse_tz(name: str | None) -> ZoneInfo:
+@cache
+def _tz_links() -> dict[str, str]:
+    """Legacy alias -> canonical IANA name (Asia/Calcutta -> Asia/Kolkata), from tzdata."""
     try:
-        return ZoneInfo(name or "UTC")
+        text = resources.files("tzdata").joinpath("zoneinfo/tzdata.zi").read_text()
+    except (FileNotFoundError, ModuleNotFoundError):
+        return {}
+    links: dict[str, str] = {}
+    for line in text.splitlines():
+        if line.startswith("L "):
+            _, target, alias = line.split()[:3]
+            links[alias] = target
+    # Links can chain; resolve to the final zone.
+    for alias, target in links.items():
+        while target in links:
+            target = links[target]
+        links[alias] = target
+    return links
+
+
+def canonical_tz_name(name: str) -> str:
+    return _tz_links().get(name, name)
+
+
+def parse_tz(name: str | None) -> ZoneInfo:
+    """Browsers still report legacy names (Chrome: "Asia/Calcutta"). Python accepts them but
+    Postgres may not, and the name is passed into SQL, so always return the canonical zone."""
+    try:
+        return ZoneInfo(canonical_tz_name(name or "UTC"))
     except (ZoneInfoNotFoundError, ValueError) as exc:
         raise ValidationFailed("tz", f"Unknown timezone: {name}") from exc
 

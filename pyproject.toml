@@ -15,6 +15,7 @@ dependencies = [
     "redis>=5",
     "sqlalchemy[asyncio]>=2",
     "structlog>=26.1.0",
+    "tzdata>=2026.6",
     "webauthn>=3.0.1",
 ]
 
