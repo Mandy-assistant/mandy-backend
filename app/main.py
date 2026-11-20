@@ -14,8 +14,11 @@ from app.core.redis import close_redis
 from app.db.session import engine
 from app.features.auth.router import dev_router as auth_dev_router
 from app.features.auth.router import router as auth_router
+from app.features.dashboard.router import router as dashboard_router
+from app.features.focus.router import router as focus_router
 from app.features.health.router import router as health_router
 from app.features.jobs.router import router as jobs_router
+from app.features.news.router import router as news_router
 from app.features.profile.router import router as profile_router
 from app.features.resumes.router import router as resumes_router
 from app.features.roadmaps.router import router as roadmaps_router
@@ -67,6 +70,9 @@ def build_api_router(settings: Settings) -> APIRouter:
     api.include_router(jobs_router)
     api.include_router(roadmaps_router)
     api.include_router(tasks_router)
+    api.include_router(focus_router)
+    api.include_router(news_router)
+    api.include_router(dashboard_router)
     if settings.dev_login_active:
         api.include_router(auth_dev_router)
     return api
