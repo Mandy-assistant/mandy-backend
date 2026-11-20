@@ -12,6 +12,7 @@ from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.core.redis import close_redis
 from app.db.session import engine
+from app.features.assistant.router import router as assistant_router
 from app.features.auth.router import dev_router as auth_dev_router
 from app.features.auth.router import router as auth_router
 from app.features.dashboard.router import router as dashboard_router
@@ -68,6 +69,7 @@ def build_api_router(settings: Settings) -> APIRouter:
     api.include_router(profile_router)
     api.include_router(resumes_router)
     api.include_router(jobs_router)
+    api.include_router(assistant_router)  # before roadmaps: owns POST /roadmaps/generate
     api.include_router(roadmaps_router)
     api.include_router(tasks_router)
     api.include_router(focus_router)
