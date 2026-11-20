@@ -156,6 +156,11 @@ Additions/clarifications made while implementing the backend (no breaking change
 - `POST /auth/passkeys/verify` responds `201`. All `POST` create endpoints (`/jobs`, `/tasks`, `/roadmaps`, milestones,
   profile items, resumes, `/resumes/{id}/duplicate`, `/resumes/{id}/versions`, `/focus/sessions`, `/roadmaps/generate`)
   respond `201`; `POST /roadmaps` returns `RoadmapDetail`.
+- Other error codes: 502 `AI_ERROR` (Gemini returned an error/unexpected output), 413 `PAYLOAD_TOO_LARGE` (body > 1 MiB),
+  422 `INVALID_ORDER` (milestone reorder ids mismatch), `EMAIL_TAKEN` (409), `<RESOURCE>_NOT_FOUND` codes
+  (`JOB_NOT_FOUND`, `TASK_NOT_FOUND`, `ROADMAP_NOT_FOUND`, `MILESTONE_NOT_FOUND`, `RESUME_NOT_FOUND`, `VERSION_NOT_FOUND`,
+  `NEWS_NOT_FOUND`, `EXPERIENCE_NOT_FOUND`, `EDUCATION_NOT_FOUND`, `SKILL_NOT_FOUND`).
+- `GET /health` returns 503 with the same body shape (`"status": "error"`) when Postgres or Redis is down.
 - Jobs board ordering: `sort=position` added; `position` semantics for moves defined above (frontend request).
 - Postgres host port is configurable via `POSTGRES_HOST_PORT` (docker compose, default `5433`) for machines where 5433
   is also taken; `DATABASE_URL` must match.
