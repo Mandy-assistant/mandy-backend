@@ -18,6 +18,8 @@ from app.features.health.router import router as health_router
 from app.features.jobs.router import router as jobs_router
 from app.features.profile.router import router as profile_router
 from app.features.resumes.router import router as resumes_router
+from app.features.roadmaps.router import router as roadmaps_router
+from app.features.tasks.router import router as tasks_router
 
 API_PREFIX = "/api/v1"
 
@@ -63,6 +65,8 @@ def build_api_router(settings: Settings) -> APIRouter:
     api.include_router(profile_router)
     api.include_router(resumes_router)
     api.include_router(jobs_router)
+    api.include_router(roadmaps_router)
+    api.include_router(tasks_router)
     if settings.dev_login_active:
         api.include_router(auth_dev_router)
     return api
