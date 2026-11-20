@@ -51,6 +51,10 @@ under it for 5 minutes and deleted on first use.
 - `POST /auth/refresh` → `{user}` + new cookies; `POST /auth/logout` → 204, clears cookies; `GET /auth/me` → `User`
 - `POST /auth/dev-login` → `{user}` + cookies. **Only registered when `DEV_LOGIN_ENABLED=true` and `ENV=dev`.** For local testing/e2e without an authenticator.
 - Rate limit: `/auth/login/*`, `/auth/recover*` → 5 / minute / IP → 429 `RATE_LIMITED`.
+- Session hint cookie: whenever the auth cookies are set (setup/verify, login/verify, recover/verify, refresh, dev-login)
+  the API also sets `mandy_session=1` — path `/`, **not** httpOnly, SameSite=Lax, Secure outside dev, max-age = refresh
+  token lifetime (7 days). It carries no secret. It is cleared on logout and whenever refresh fails. (`refresh_token` is
+  scoped to `/api/v1/auth`, so the Next.js proxy checks `mandy_session` for an optimistic signed-in redirect.)
 
 `User` = `{id, email, display_name, created_at}`
 `Passkey` = `{id, device_name, transports: [str], created_at, last_used_at}`
@@ -136,3 +140,14 @@ under it for 5 minutes and deleted on first use.
   Gemini gets a compact context (open tasks, jobs pipeline, current roadmap, profile headline) and function tools
   `create_task(title, due_date?, priority?)`, `create_job(company, role, location?, url?, status?)`. Tool calls are executed for the current user.
 - `POST /ai/rewrite` `{text, kind: "summary"|"bullet"|"cover_note", instruction?}` → `{text}` (used by the resume editor)
+
+## Changes
+
+Additions/clarifications made while implementing the backend (no breaking changes to the above):
+
+- Auth error codes beyond the ones listed: `CHALLENGE_EXPIRED` (401, unknown/expired/already-used `flow_id`),
+  `RECOVERY_TOKEN_INVALID` (401, bad/expired/used recovery token), `PASSKEY_EXISTS` (409, credential already registered),
+  `PASSKEY_NOT_FOUND` (404). Refresh tokens are rotated: a used refresh token is rejected (401) and the cookies are cleared.
+- `POST /auth/passkeys/verify` responds `201`.
+- Postgres host port is configurable via `POSTGRES_HOST_PORT` (docker compose, default `5433`) for machines where 5433
+  is also taken; `DATABASE_URL` must match.

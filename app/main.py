@@ -12,6 +12,8 @@ from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.core.redis import close_redis
 from app.db.session import engine
+from app.features.auth.router import dev_router as auth_dev_router
+from app.features.auth.router import router as auth_router
 from app.features.health.router import router as health_router
 
 API_PREFIX = "/api/v1"
@@ -54,6 +56,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 def build_api_router(settings: Settings) -> APIRouter:
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(health_router)
+    api.include_router(auth_router)
+    if settings.dev_login_active:
+        api.include_router(auth_dev_router)
     return api
 
 
