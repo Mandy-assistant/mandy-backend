@@ -213,21 +213,40 @@ def rank(
     opened: set[uuid.UUID],
     now: datetime,
 ) -> list[uuid.UUID]:
-    """Order by personal match, AI relevance, freshness and popularity, keeping sources varied."""
-    scored: list[tuple[float, NewsItem]] = []
+    """Order by personal match, AI relevance, freshness and popularity, keeping sources varied.
+
+    Exact keyword hits are sparse, so interest also spreads by category: if what you follow keeps
+    showing up in AI stories, other AI stories rank higher too (`affinity`). Stories that match
+    nothing you care about rely on freshness and popularity alone and sink below the ones that do.
+    """
+    matched: list[tuple[NewsItem, float]] = []
     for item in items:
         words = token_set(item.title, item.summary) | set(item.tags or [])
         personal = interests.match(weights, words, item.title)
-        if personal < 0:
-            continue  # hits a muted topic
+        if personal >= 0:  # negative = hits a muted topic
+            matched.append((item, personal))
+
+    totals: dict[str, list[float]] = {}
+    for item, personal in matched:
+        totals.setdefault(item.category, []).append(personal)
+    means = {c: sum(v) / len(v) for c, v in totals.items()}
+    top_mean = max(means.values(), default=0.0)
+    affinity = {c: (m / top_mean if top_mean > 0 else 0.0) for c, m in means.items()}
+
+    scored: list[tuple[float, NewsItem]] = []
+    for item, personal in matched:
         age_hours = max(0.0, (now - item.published_at).total_seconds() / 3600)
+        fresh = math.exp(-age_hours / 30)
         score = (
-            0.45 * personal
-            + 0.25 * math.exp(-age_hours / 30)
-            + 0.20 * _popularity(item)
-            + (0.35 * insights[item.id] / 100 if item.id in insights else 0.0)
+            0.50 * personal
+            + 0.20 * affinity.get(item.category, 0.0)
+            + 0.15 * fresh
+            + 0.15 * _popularity(item)
+            + (0.40 * insights[item.id] / 100 if item.id in insights else 0.0)
             - (0.15 if item.id in opened else 0.0)
         )
+        if weights and personal == 0 and affinity.get(item.category, 0.0) < 0.3:
+            score -= 0.1  # nothing to do with you: let it trail
         scored.append((score, item))
     scored.sort(key=lambda s: s[0], reverse=True)
 
