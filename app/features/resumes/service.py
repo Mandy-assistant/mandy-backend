@@ -214,3 +214,8 @@ async def create_from_profile(
 ) -> Resume:
     content = await build_content_from_profile(db, user)
     return await _create(db, user.id, title, template, content)
+
+
+# Public names for the AI builder.
+create_resume_raw = _create
+add_version = _add_version

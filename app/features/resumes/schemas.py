@@ -49,9 +49,18 @@ class Section(BaseModel):
     items: list[SectionItem] = Field(default=[], max_length=50)
 
 
+class ResumeStyle(BaseModel):
+    """Look of the rendered resume (set by hand or by the AI from a prompt)."""
+
+    accent: str = Field(default="#7c5cff", pattern=r"^#[0-9a-fA-F]{6}$")
+    font: Literal["sans", "serif", "mono"] = "sans"
+    density: Literal["compact", "comfortable"] = "comfortable"
+
+
 class ResumeContent(BaseModel):
     header: ResumeHeader = ResumeHeader()
     sections: list[Section] = Field(default=[], max_length=20)
+    style: ResumeStyle | None = None
 
 
 class ResumeCreate(BaseModel):
@@ -86,3 +95,30 @@ class ResumeVersionOut(ORMModel):
     version: int
     content: ResumeContent
     created_at: UTCDateTime
+
+
+class ResumeGenerate(BaseModel):
+    prompt: str = Field(
+        min_length=3,
+        max_length=4000,
+        description="Describe the template, look and content you want",
+        examples=["One page, classic serif, navy accent. Lead with my Python and ML work."],
+    )
+    job_description: str | None = Field(
+        default=None, max_length=12000, description="Paste a job post to tailor the resume to it"
+    )
+    title: str | None = Field(default=None, max_length=200)
+
+
+class ResumeRevise(BaseModel):
+    prompt: str = Field(
+        min_length=3,
+        max_length=4000,
+        examples=["Make it fit one page and emphasise backend work"],
+    )
+    job_description: str | None = Field(default=None, max_length=12000)
+
+
+class ResumeAIResult(BaseModel):
+    resume: ResumeOut
+    notes: str = Field(description="What the AI did and anything it could not do")

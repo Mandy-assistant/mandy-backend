@@ -189,3 +189,11 @@ def get_ai_client() -> AIClient:
     if not settings.ai_enabled:
         raise AIUnavailableError()
     return _gemini(settings.gemini_api_key.get_secret_value(), settings.gemini_model)
+
+
+def get_optional_ai_client() -> AIClient | None:
+    """FastAPI dependency for features that work without AI and get better with it."""
+    settings = get_settings()
+    if not settings.ai_enabled:
+        return None
+    return _gemini(settings.gemini_api_key.get_secret_value(), settings.gemini_model)

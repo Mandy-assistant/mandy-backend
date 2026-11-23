@@ -12,7 +12,7 @@ from typing import Protocol
 import httpx
 
 from app.core.logging import get_logger
-from app.features.news.models import NewsCategory
+from app.features.news.models import NewsCategory, NewsKind
 
 log = get_logger(__name__)
 
@@ -29,6 +29,7 @@ class FeedConfig:
     url: str
     source: str
     category: NewsCategory
+    kind: NewsKind = NewsKind.ARTICLE
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,12 @@ class FetchedNews:
     image_url: str | None
     category: NewsCategory
     published_at: datetime
+    kind: NewsKind = NewsKind.ARTICLE
+    score: int = 0
+    comments: int = 0
+    discussion_url: str | None = None
+    author: str | None = None
+    tags: tuple[str, ...] = ()
 
 
 class NewsProvider(Protocol):
@@ -59,6 +66,16 @@ DEFAULT_FEEDS: list[FeedConfig] = [
     FeedConfig("https://krebsonsecurity.com/feed/", "Krebs on Security", NewsCategory.SECURITY),
     FeedConfig(
         "https://feeds.feedburner.com/TheHackersNews", "The Hacker News", NewsCategory.SECURITY
+    ),
+    FeedConfig("https://github.blog/feed/", "GitHub Blog", NewsCategory.DEV),
+    FeedConfig("https://openai.com/news/rss.xml", "OpenAI", NewsCategory.AI),
+    FeedConfig(
+        "https://android-developers.googleblog.com/feeds/posts/default",
+        "Android Developers",
+        NewsCategory.MOBILE,
+    ),
+    FeedConfig(
+        "https://www.producthunt.com/feed", "Product Hunt", NewsCategory.DEV, NewsKind.LAUNCH
     ),
 ]
 
@@ -137,6 +154,7 @@ def parse_feed(content: bytes, feed: FeedConfig) -> list[FetchedNews]:
                 image_url=_image(entry, description),
                 category=feed.category,
                 published_at=published or datetime.now(UTC),
+                kind=feed.kind,
             )
         )
     return items

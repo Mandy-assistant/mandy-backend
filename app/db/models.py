@@ -2,9 +2,11 @@
 
 from app.db.base import Base
 from app.features.auth.models import PasskeyCredential, RecoveryCode, User
+from app.features.discover.models import JobMatch, JobPosting
 from app.features.focus.models import FocusSession
 from app.features.jobs.models import Job, JobStatusEvent
-from app.features.news.models import NewsItem, SavedNews
+from app.features.news.models import NewsInsight, NewsInteraction, NewsItem, SavedNews
+from app.features.personalize.models import InterestProfile, SearchEvent
 from app.features.profile.models import Education, Experience, Profile, Skill
 from app.features.resumes.models import Resume, ResumeVersion
 from app.features.roadmaps.models import Milestone, Roadmap
@@ -15,9 +17,14 @@ __all__ = [
     "Education",
     "Experience",
     "FocusSession",
+    "InterestProfile",
     "Job",
+    "JobMatch",
+    "JobPosting",
     "JobStatusEvent",
     "Milestone",
+    "NewsInsight",
+    "NewsInteraction",
     "NewsItem",
     "PasskeyCredential",
     "Profile",
@@ -26,6 +33,7 @@ __all__ = [
     "ResumeVersion",
     "Roadmap",
     "SavedNews",
+    "SearchEvent",
     "Skill",
     "Task",
     "User",

@@ -19,6 +19,7 @@ from app.features.auth.models import User
 from app.features.jobs import service as job_service
 from app.features.jobs.models import Job, JobStatus
 from app.features.jobs.schemas import JobCreate
+from app.features.personalize import service as interests
 from app.features.profile.models import Profile
 from app.features.roadmaps import service as roadmap_service
 from app.features.roadmaps.models import MilestoneStatus, Roadmap, RoadmapStatus
@@ -91,7 +92,7 @@ high-quality free resources with real, well-known URLs (official docs, reputable
 
 
 async def build_context(db: AsyncSession, user: User, today: date) -> str:
-    lines: list[str] = []
+    lines: list[str] = [await interests.context(db, user)]
     profile = await db.scalar(select(Profile).where(Profile.user_id == user.id))
     if profile and (profile.headline or profile.target_roles):
         lines.append(

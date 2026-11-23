@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -9,6 +10,8 @@ from app.db.session import DbSession
 from app.features.assistant import service
 from app.features.assistant.schemas import AskIn, AskOut, AssistantStatus, RewriteIn, RewriteOut
 from app.features.auth.deps import CurrentUser
+from app.features.resumes import ai as resume_ai
+from app.features.resumes.schemas import ResumeAIResult, ResumeGenerate, ResumeOut, ResumeRevise
 from app.features.roadmaps.schemas import RoadmapDetail, RoadmapGenerate
 
 router = APIRouter(tags=["assistant"], responses=error_responses(401))
@@ -55,3 +58,32 @@ async def generate_roadmap(
     body: RoadmapGenerate, user: CurrentUser, db: DbSession, ai: AI
 ) -> RoadmapDetail:
     return await service.generate_roadmap(db, user, ai, body)
+
+
+@router.post(
+    "/resumes/generate",
+    response_model=ResumeAIResult,
+    status_code=201,
+    tags=["resumes"],
+    summary="Describe the template, look and content; Gemini builds it from your profile",
+    responses=AI_ERRORS,
+)
+async def generate_resume(
+    body: ResumeGenerate, user: CurrentUser, db: DbSession, ai: AI
+) -> ResumeAIResult:
+    resume, notes = await resume_ai.generate(db, user, ai, body)
+    return ResumeAIResult(resume=ResumeOut.model_validate(resume), notes=notes)
+
+
+@router.post(
+    "/resumes/{resume_id}/revise",
+    response_model=ResumeAIResult,
+    tags=["resumes"],
+    summary="Change a resume with a prompt (saved as a new version you can restore from)",
+    responses={**AI_ERRORS, **error_responses(404)},
+)
+async def revise_resume(
+    resume_id: uuid.UUID, body: ResumeRevise, user: CurrentUser, db: DbSession, ai: AI
+) -> ResumeAIResult:
+    resume, notes = await resume_ai.revise(db, user, ai, resume_id, body)
+    return ResumeAIResult(resume=ResumeOut.model_validate(resume), notes=notes)

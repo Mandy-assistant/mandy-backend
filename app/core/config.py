@@ -74,6 +74,13 @@ class Settings(BaseSettings):
     news_cache_seconds: int = 300
     dashboard_cache_seconds: int = 60
     news_feeds_enabled: bool = True
+    # Pull news / job boards again when the last pull is older than this (on the next visit).
+    news_refresh_minutes: int = 30
+    jobs_refresh_minutes: int = 180
+    # Reddit only answers servers with OAuth: create a free "script" app at reddit.com/prefs/apps
+    reddit_client_id: str = ""
+    reddit_client_secret: SecretStr = SecretStr("")
+    reddit_subreddits: list[str] = []
 
     @field_validator("database_url", "database_url_unpooled", "test_database_url")
     @classmethod

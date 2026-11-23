@@ -59,7 +59,9 @@ curl -s -b /tmp/mandy.jar "localhost:8000/api/v1/dashboard/summary?tz=Asia/Kolka
 | `DEV_LOGIN_ENABLED` | `false` | **dev only**; `.env.example` turns it on for local work |
 | `GEMINI_API_KEY` | empty | empty → AI endpoints return 503 `AI_UNAVAILABLE` |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | |
-| `NEWS_FEEDS_ENABLED` | `true` | `POST /news/refresh` pulls RSS feeds when true |
+| `NEWS_FEEDS_ENABLED` | `true` | Pull news sources and job boards (on a visit, when due, and on `POST .../refresh`) |
+| `NEWS_REFRESH_MINUTES` / `JOBS_REFRESH_MINUTES` | `30` / `180` | How stale a pull may get before a visit triggers a new one |
+| `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | empty | Free "script" app from reddit.com/prefs/apps; empty skips Reddit |
 | `LOG_LEVEL` / `LOG_JSON` | `INFO` / JSON outside dev | |
 
 ### Free Gemini key
@@ -68,6 +70,17 @@ curl -s -b /tmp/mandy.jar "localhost:8000/api/v1/dashboard/summary?tz=Asia/Kolka
 2. *Create API key* → copy it.
 3. Put it in `.env` as `GEMINI_API_KEY=...` and restart the API. `GET /api/v1/assistant/status` then reports
    `"enabled": true`. The free tier is rate-limited; when the quota is hit the API answers 429 `AI_RATE_LIMITED`.
+
+## Personalisation
+
+`app/features/personalize` keeps one interest profile per user: topics they follow or mute, job
+regions (remote / india / anywhere) and weights learned from what they do: likes, saves and opens
+on news, searches, tracked jobs, skills and target roles (recent activity counts more). The same
+profile ranks the news feed (`GET /news/feed`) and job discovery (`GET /jobs/discover`), and its
+plain-text form (`GET /interests` → `context`) goes into every Gemini prompt: news "why it matters"
+notes, job fit checks, prompt-built resumes (`POST /resumes/generate`, `POST /resumes/{id}/revise`)
+and the chat assistant. AI work for the feeds runs in the background with a per-user cooldown so
+the free Gemini quota holds.
 
 ## Common commands
 
