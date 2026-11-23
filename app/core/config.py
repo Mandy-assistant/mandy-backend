@@ -20,9 +20,14 @@ def to_asyncpg_url(url: str) -> str:
     Sets the `postgresql+asyncpg` driver, renames `sslmode` to asyncpg's `ssl`, and drops
     `channel_binding` (asyncpg rejects it; the connection still uses SCRAM over TLS).
     """
+    # Dashboards keep quotes pasted from a .env line (DATABASE_URL="postgresql://...").
+    url = url.strip().strip("'\"").strip()
     parts = urlsplit(url)
     if parts.scheme not in ("postgres", "postgresql", "postgresql+asyncpg"):
-        return url
+        raise ValueError(
+            "must be a Postgres URL starting with postgresql:// "
+            f"(got one starting with {url[:12]!r})"
+        )
     query = [
         (_SSL_ALIASES.get(key, key), value)
         for key, value in parse_qsl(parts.query, keep_blank_values=True)
@@ -74,6 +79,11 @@ class Settings(BaseSettings):
     @classmethod
     def _asyncpg_url(cls, value: str | None) -> str | None:
         return to_asyncpg_url(value) if value else value
+
+    @field_validator("redis_url", "test_redis_url")
+    @classmethod
+    def _strip_quotes(cls, value: str | None) -> str | None:
+        return value.strip().strip("'\"").strip() if value else value
 
     @property
     def uses_connection_pooler(self) -> bool:
