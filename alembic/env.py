@@ -20,7 +20,13 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    url = config.attributes.get("database_url") or get_settings().database_url
+    settings = get_settings()
+    # Migrations run DDL and take locks: prefer the direct connection over the pooler.
+    url = (
+        config.attributes.get("database_url")
+        or settings.database_url_unpooled
+        or settings.database_url
+    )
     return str(url)
 
 

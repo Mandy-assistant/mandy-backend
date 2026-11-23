@@ -2,11 +2,33 @@
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import SecretStr, model_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_JWT_SECRET = "dev-only-change-me-dev-only-change-me"  # noqa: S105
+
+# libpq options that asyncpg doesn't accept as-is.
+_SSL_ALIASES = {"sslmode": "ssl"}
+_DROPPED_PARAMS = {"channel_binding"}
+
+
+def to_asyncpg_url(url: str) -> str:
+    """Make a plain `postgres://` URL (as Neon or Render hand out) usable by SQLAlchemy + asyncpg.
+
+    Sets the `postgresql+asyncpg` driver, renames `sslmode` to asyncpg's `ssl`, and drops
+    `channel_binding` (asyncpg rejects it; the connection still uses SCRAM over TLS).
+    """
+    parts = urlsplit(url)
+    if parts.scheme not in ("postgres", "postgresql", "postgresql+asyncpg"):
+        return url
+    query = [
+        (_SSL_ALIASES.get(key, key), value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key not in _DROPPED_PARAMS
+    ]
+    return urlunsplit(parts._replace(scheme="postgresql+asyncpg", query=urlencode(query)))
 
 
 class Settings(BaseSettings):
@@ -18,8 +40,12 @@ class Settings(BaseSettings):
     log_json: bool | None = None  # default: JSON outside dev
 
     database_url: str = "postgresql+asyncpg://mandy:mandy@localhost:5433/mandy"
+    # Direct (non-pooled) connection, used for migrations when set. `neon env pull` provides it.
+    database_url_unpooled: str | None = None
     test_database_url: str | None = None
     redis_url: str = "redis://localhost:6379/0"
+    # Tests flush this database before every test; keep it local when REDIS_URL is a hosted store.
+    test_redis_url: str | None = None
 
     jwt_secret: SecretStr = SecretStr(DEFAULT_JWT_SECRET)
     jwt_algorithm: str = "HS256"
@@ -43,6 +69,16 @@ class Settings(BaseSettings):
     news_cache_seconds: int = 300
     dashboard_cache_seconds: int = 60
     news_feeds_enabled: bool = True
+
+    @field_validator("database_url", "database_url_unpooled", "test_database_url")
+    @classmethod
+    def _asyncpg_url(cls, value: str | None) -> str | None:
+        return to_asyncpg_url(value) if value else value
+
+    @property
+    def uses_connection_pooler(self) -> bool:
+        """Neon's pooled host (`-pooler.`) runs PgBouncer in transaction mode."""
+        return "-pooler." in (urlsplit(self.database_url).hostname or "")
 
     @model_validator(mode="after")
     def _check_production(self) -> "Settings":

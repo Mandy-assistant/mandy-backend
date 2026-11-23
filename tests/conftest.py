@@ -16,7 +16,7 @@ _base = Settings()
 TEST_DATABASE_URL = _base.test_database_url or make_url(_base.database_url).set(
     database="mandy_test"
 ).render_as_string(hide_password=False)
-TEST_REDIS_URL = _base.redis_url.rsplit("/", 1)[0] + "/15"
+TEST_REDIS_URL = _base.test_redis_url or _base.redis_url.rsplit("/", 1)[0] + "/15"
 
 os.environ.update(
     {
