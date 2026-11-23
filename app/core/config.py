@@ -87,6 +87,25 @@ class Settings(BaseSettings):
     def _asyncpg_url(cls, value: str | None) -> str | None:
         return to_asyncpg_url(value) if value else value
 
+    @field_validator("origin")
+    @classmethod
+    def _origin(cls, value: str) -> str:
+        # Browsers report the origin without a trailing slash; WebAuthn compares it exactly.
+        return value.strip().strip("'\"").rstrip("/")
+
+    @field_validator("rp_id")
+    @classmethod
+    def _rp_id(cls, value: str) -> str:
+        # The RP ID is a bare host: accept a pasted URL and keep only the host.
+        host = value.strip().strip("'\"")
+        host = host.split("://", 1)[-1]
+        return host.split("/", 1)[0].split(":", 1)[0]
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _cors(cls, value: list[str]) -> list[str]:
+        return [o.strip().rstrip("/") for o in value]
+
     @field_validator("redis_url", "test_redis_url")
     @classmethod
     def _strip_quotes(cls, value: str | None) -> str | None:
