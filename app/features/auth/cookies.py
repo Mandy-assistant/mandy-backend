@@ -1,8 +1,8 @@
 """Session cookies: access/refresh tokens (httpOnly) + the `mandy_session` hint cookie.
 
-`refresh_token` is scoped to `/api/v1/auth`, so the frontend's Next.js proxy can't see it on
-page requests. `mandy_session=1` (not httpOnly, no secret in it) tells the proxy that a session
-probably exists, for an optimistic signed-in redirect.
+`refresh_token` is scoped to `/api/<API_VERSION>/auth`, so the frontend's Next.js proxy can't
+see it on page requests. `mandy_session=1` (not httpOnly, no secret in it) tells the proxy
+that a session probably exists, for an optimistic signed-in redirect.
 """
 
 import uuid
@@ -16,7 +16,11 @@ from app.core.security import IssuedToken, create_token
 ACCESS_COOKIE = "access_token"
 REFRESH_COOKIE = "refresh_token"
 SESSION_HINT_COOKIE = "mandy_session"
-REFRESH_PATH = "/api/v1/auth"
+
+
+def refresh_path() -> str:
+    """The refresh cookie is only sent to the auth routes of the API version being served."""
+    return f"{get_settings().api_prefix}/auth"
 
 
 def set_auth_cookies(response: Response, user_id: uuid.UUID) -> IssuedToken:
@@ -38,7 +42,7 @@ def set_auth_cookies(response: Response, user_id: uuid.UUID) -> IssuedToken:
         REFRESH_COOKIE,
         refresh.token,
         max_age=refresh.max_age,
-        path=REFRESH_PATH,
+        path=refresh_path(),
         httponly=True,
         secure=secure,
         samesite="lax",
@@ -60,6 +64,6 @@ def clear_auth_cookies(response: Response) -> None:
     secure = settings.cookie_secure
     response.delete_cookie(ACCESS_COOKIE, path="/", httponly=True, secure=secure, samesite="lax")
     response.delete_cookie(
-        REFRESH_COOKIE, path=REFRESH_PATH, httponly=True, secure=secure, samesite="lax"
+        REFRESH_COOKIE, path=refresh_path(), httponly=True, secure=secure, samesite="lax"
     )
     response.delete_cookie(SESSION_HINT_COOKIE, path="/", secure=secure, samesite="lax")

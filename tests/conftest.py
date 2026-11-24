@@ -129,7 +129,7 @@ async def make_client(app, db: AsyncSession) -> AsyncIterator[ClientFactory]:  #
             headers["Authorization"] = f"Bearer {token}"
         client = httpx.AsyncClient(
             transport=httpx.ASGITransport(app=target),
-            base_url="http://test/api/v1",
+            base_url=f"http://test{get_settings().api_prefix}",
             headers=headers,
         )
         clients.append(client)

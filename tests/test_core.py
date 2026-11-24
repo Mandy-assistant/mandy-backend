@@ -114,3 +114,16 @@ async def test_body_size_limit_streamed(app) -> None:  # type: ignore[no-untyped
     ) as c:
         r = await c.post("/api/v1/auth/setup/options", content=chunks())
     assert r.status_code == 413 and r.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"
+
+
+def test_api_version_setting() -> None:
+    assert Settings(api_version=" /V1 ").api_version == "v1"
+    assert Settings(api_version="v1").api_prefix == "/api/v1"
+    with pytest.raises(ValueError, match="api_version"):
+        Settings(api_version="v9")
+
+
+def test_only_selected_version_is_mounted(app) -> None:  # type: ignore[no-untyped-def]
+    paths = set(app.openapi()["paths"])
+    assert "/api/v1/health" in paths
+    assert not any(p.startswith("/api/") and not p.startswith("/api/v1/") for p in paths)

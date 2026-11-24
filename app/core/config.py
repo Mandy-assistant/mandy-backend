@@ -7,6 +7,9 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Versions this build can serve; `API_VERSION` picks one (see app/api/__init__.py).
+ApiVersion = Literal["v1"]
+
 DEFAULT_JWT_SECRET = "dev-only-change-me-dev-only-change-me"  # noqa: S105
 
 # libpq options that asyncpg doesn't accept as-is.
@@ -43,6 +46,9 @@ class Settings(BaseSettings):
     app_name: str = "Mandy API"
     log_level: str = "INFO"
     log_json: bool | None = None  # default: JSON outside dev
+
+    # Which API version this process serves, mounted at /api/<version>. Others are not exposed.
+    api_version: ApiVersion = "v1"
 
     database_url: str = "postgresql+asyncpg://mandy:mandy@localhost:5433/mandy"
     # Direct (non-pooled) connection, used for migrations when set. `neon env pull` provides it.
@@ -87,6 +93,14 @@ class Settings(BaseSettings):
     def _asyncpg_url(cls, value: str | None) -> str | None:
         return to_asyncpg_url(value) if value else value
 
+    @field_validator("api_version", mode="before")
+    @classmethod
+    def _api_version(cls, value: object) -> object:
+        # Accept "V1", "/v1" or " v1 " as v1.
+        if isinstance(value, str):
+            return value.strip().strip("'\"").strip("/").lower()
+        return value
+
     @field_validator("origin")
     @classmethod
     def _origin(cls, value: str) -> str:
@@ -125,6 +139,10 @@ class Settings(BaseSettings):
             if self.dev_login_enabled:
                 raise ValueError("DEV_LOGIN_ENABLED must be false in prod")
         return self
+
+    @property
+    def api_prefix(self) -> str:
+        return f"/api/{self.api_version}"
 
     @property
     def is_dev(self) -> bool:

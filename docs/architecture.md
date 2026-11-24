@@ -28,7 +28,9 @@ flowchart LR
 
 ```
 app/
-  main.py            app factory: middleware, exception handlers, routers under /api/v1
+  main.py            app factory: middleware, exception handlers, mounts the API version
+  api/               versioned routers: API_VERSION (env) picks one, served at /api/<version>
+    v1/router.py     the feature routers v1 exposes
   core/              config, logging, exceptions, security (JWT/argon2), redis+cache, rate limit, middleware, ai
   db/                Declarative base (naming convention), UUID + timestamp mixins, async session, model registry
   shared/            pagination (Page[T]), ownership helper, timezone helpers, common schema types

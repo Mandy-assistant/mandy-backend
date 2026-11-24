@@ -3,9 +3,10 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api import build_api_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
@@ -16,22 +17,6 @@ from app.core.middleware import (
 )
 from app.core.redis import close_redis
 from app.db.session import engine
-from app.features.assistant.router import router as assistant_router
-from app.features.auth.router import dev_router as auth_dev_router
-from app.features.auth.router import router as auth_router
-from app.features.dashboard.router import router as dashboard_router
-from app.features.discover.router import router as discover_router
-from app.features.focus.router import router as focus_router
-from app.features.health.router import router as health_router
-from app.features.jobs.router import router as jobs_router
-from app.features.news.router import router as news_router
-from app.features.personalize.router import router as interests_router
-from app.features.profile.router import router as profile_router
-from app.features.resumes.router import router as resumes_router
-from app.features.roadmaps.router import router as roadmaps_router
-from app.features.tasks.router import router as tasks_router
-
-API_PREFIX = "/api/v1"
 
 DESCRIPTION = """
 Mandy is a single-owner career assistant: job tracker, learning roadmaps, study tasks,
@@ -39,9 +24,9 @@ resumes, tech news and a Gemini-powered assistant.
 
 **Auth** uses passkeys (WebAuthn) and httpOnly cookies. For Swagger, sign in and paste the
 access token into *Authorize* (`Authorization: Bearer <token>`); in local dev you can use
-`POST /api/v1/auth/dev-login` when `DEV_LOGIN_ENABLED=true`.
+`POST {prefix}/auth/dev-login` when `DEV_LOGIN_ENABLED=true`.
 
-Every error has the shape `{"error": {"code", "message", "details"}}`.
+Every error has the shape `{{"error": {{"code", "message", "details"}}}}`.
 """
 
 TAGS = [
@@ -68,26 +53,6 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     get_logger("mandy").info("shutdown")
 
 
-def build_api_router(settings: Settings) -> APIRouter:
-    api = APIRouter(prefix=API_PREFIX)
-    api.include_router(health_router)
-    api.include_router(auth_router)
-    api.include_router(profile_router)
-    api.include_router(resumes_router)
-    api.include_router(discover_router)  # before jobs: owns /jobs/discover
-    api.include_router(jobs_router)
-    api.include_router(assistant_router)  # before roadmaps: owns POST /roadmaps/generate
-    api.include_router(roadmaps_router)
-    api.include_router(tasks_router)
-    api.include_router(focus_router)
-    api.include_router(news_router)
-    api.include_router(interests_router)
-    api.include_router(dashboard_router)
-    if settings.dev_login_active:
-        api.include_router(auth_dev_router)
-    return api
-
-
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings)
@@ -95,7 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version="1.0.0",
-        description=DESCRIPTION,
+        description=DESCRIPTION.format(prefix=settings.api_prefix),
         openapi_tags=TAGS,
         lifespan=lifespan,
         docs_url="/docs",
