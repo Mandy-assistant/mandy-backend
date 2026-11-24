@@ -16,11 +16,12 @@ from collections.abc import Callable
 
 from fastapi import APIRouter
 
-from app.api import v1
+from app.api import v1, v2
 from app.core.config import Settings
 
 VERSIONS: dict[str, Callable[[Settings], APIRouter]] = {
     "v1": v1.build_router,
+    "v2": v2.build_router,
 }
 
 

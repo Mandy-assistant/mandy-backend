@@ -8,7 +8,7 @@ from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Versions this build can serve; `API_VERSION` picks one (see app/api/__init__.py).
-ApiVersion = Literal["v1"]
+ApiVersion = Literal["v1", "v2"]
 
 DEFAULT_JWT_SECRET = "dev-only-change-me-dev-only-change-me"  # noqa: S105
 

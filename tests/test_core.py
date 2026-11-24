@@ -2,7 +2,7 @@ import httpx
 import pytest
 from fastapi import APIRouter
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.core.security import create_token, decode_token
 from app.main import create_app
 from tests.conftest import ClientFactory
@@ -31,7 +31,7 @@ async def test_docs_have_no_strict_csp(app) -> None:  # type: ignore[no-untyped-
         r = await c.get("/docs")
         assert r.status_code == 200 and "content-security-policy" not in r.headers
         spec = (await c.get("/openapi.json")).json()
-        assert "/api/v1/dashboard/summary" in spec["paths"]
+        assert f"{get_settings().api_prefix}/dashboard/summary" in spec["paths"]
         assert "ErrorResponse" in spec["components"]["schemas"]
         assert "HTTPBearer" in spec["components"]["securitySchemes"]
 
@@ -112,18 +112,25 @@ async def test_body_size_limit_streamed(app) -> None:  # type: ignore[no-untyped
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as c:
-        r = await c.post("/api/v1/auth/setup/options", content=chunks())
+        r = await c.post(f"{get_settings().api_prefix}/auth/setup/options", content=chunks())
     assert r.status_code == 413 and r.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"
 
 
 def test_api_version_setting() -> None:
     assert Settings(api_version=" /V1 ").api_version == "v1"
     assert Settings(api_version="v1").api_prefix == "/api/v1"
+    assert Settings(api_version="v2").api_prefix == "/api/v2"
     with pytest.raises(ValueError, match="api_version"):
         Settings(api_version="v9")
 
 
 def test_only_selected_version_is_mounted(app) -> None:  # type: ignore[no-untyped-def]
     paths = set(app.openapi()["paths"])
-    assert "/api/v1/health" in paths
-    assert not any(p.startswith("/api/") and not p.startswith("/api/v1/") for p in paths)
+    prefix = get_settings().api_prefix
+    assert f"{prefix}/health" in paths
+    assert not any(p.startswith("/api/") and not p.startswith(f"{prefix}/") for p in paths)
+
+
+def test_v2_starts_with_no_routes() -> None:
+    v2 = create_app(get_settings().model_copy(update={"api_version": "v2"}))
+    assert v2.openapi()["paths"] == {}

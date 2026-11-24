@@ -21,6 +21,8 @@ TEST_REDIS_URL = _base.test_redis_url or _base.redis_url.rsplit("/", 1)[0] + "/1
 os.environ.update(
     {
         "ENV": "test",
+        # The suite exercises the v1 endpoints, whatever API_VERSION the local .env picks.
+        "API_VERSION": "v1",
         "DATABASE_URL": TEST_DATABASE_URL,
         "REDIS_URL": TEST_REDIS_URL,
         "GEMINI_API_KEY": "",
