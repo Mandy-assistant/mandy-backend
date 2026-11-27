@@ -1,0 +1,1 @@
+"""Mandy API application package."""
